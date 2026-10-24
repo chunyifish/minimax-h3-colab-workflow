@@ -1,22 +1,21 @@
-"""Run MiniMax H3 (and, if you have no usable GPU, the whole pipeline) on Google Colab from your own computer.
-Everything stays on your disk: first frames / voices are uploaded, finished clips are downloaded, the Colab VM is wiped when it stops.
-Needs: the Colab CLI (uv tool install google-colab-cli; Windows also: python cloud/colab_cli_windows_patch.py), `colab usage` signed in
-once with the Google account that has the Google AI plan (or Colab pay-as-you-go compute units). Standard library only.
+"""Run the complete MiniMax H3 film workflow on Google Colab from a lightweight local control computer.
+All model generation and post-production run in the Colab VM. The local computer edits project files, transfers assets,
+and receives the finished outputs. No local GPU, CUDA, ComfyUI, or model weights are required.
+Needs: the Colab CLI (uv tool install google-colab-cli; Windows also: python cloud/colab_cli_windows_patch.py), `colab usage`
+signed in with an account that has available Colab compute. Standard library only.
 
-  python cloud/colab_h3.py check                       # CLI works? balance? which GPUs?
-  python cloud/colab_h3.py start                       # DEFAULT = full install, same as the full 32G repo (voice, Qwen, Music 3, H3, FlashVSR; ~10.5 min), 2 ComfyUI instances
-  python cloud/colab_h3.py start --h3-only             # only ComfyUI + H3 (~3.7 min), 2 ComfyUI instances: local prep + cloud H3, or hybrid
-  python cloud/colab_h3.py batch a/spec.json b/spec.json ...   # upload -> render on the VM -> download clips next to each spec
-  python cloud/colab_h3.py keepalive --minutes 30      # keep the VM while you review (Colab reclaims it after ~20 min idle)
-  python cloud/colab_h3.py stop                        # stop once no more H3 is needed (before handing the cut to a human reviewer); keep it up between batch/review/retake - an idle G4 costs 8.9 units/hour, a reinstall 4-10 min
-  python cloud/colab_h3.py full-setup                  # same as the default start (kept as an alias)
-  python cloud/colab_h3.py smoke                       # after the full install: run setup/smoke_test.py on the VM, download smoke_out/
-  python cloud/colab_h3.py film pipeline/template_local [stage ...]   # after the full install: run make_film.py on the VM, sync out/ back
-  python cloud/hybrid_h3.py out/h3/S01 out/h3/S02 ...  # local GPU + Colab together (measured 2026-10-11: 34 shots 17.9 min vs 32.6 min local)
-
-Measured 2026-10-10 (Colab, Google AI Pro): G4 = RTX PRO 6000 Blackwell 96 GB, 8.90 compute units/hour; one 90-frame DMAD shot 42 s
-with models kept loaded; 2 staggered instances = 123 shots/hour (0.073 units/shot). L4 / A100 are slower AND cost more units per shot.
-G4 machines were always in the USA or the EU (Netherlands) - both are excluded territories in the MiniMax H3 licence: decide yourself."""
+  python cloud/colab_h3.py check                       # check CLI login, account balance, and active sessions
+  python cloud/colab_h3.py start                       # install the full image, voice, H3, music, and post-production environment
+  python cloud/colab_h3.py film pipeline/my_film read   # render the script timing preview in Colab before model generation
+  python cloud/colab_h3.py film pipeline/my_film chars masters frames
+  python cloud/colab_h3.py film pipeline/my_film voices h3 amb
+  python cloud/colab_h3.py film pipeline/my_film edl music ending cut review
+  python cloud/colab_h3.py batch a/spec.json b/spec.json ...   # upload ready specs, render in Colab, download clips
+  python cloud/colab_h3.py keepalive --minutes 30      # keep the VM during a review or between stages
+  python cloud/colab_h3.py status                      # inspect the current Colab session
+  python cloud/colab_h3.py stop                        # stop after required outputs are downloaded
+  python cloud/colab_h3.py smoke                       # optional remote environment check
+  python cloud/colab_h3.py film pipeline/template_colab [stage ...]  # run the sample film in Colab and sync out/ back"""
 import argparse, json, os, re, shutil, subprocess, sys, tarfile, tempfile, time, zipfile
 from pathlib import Path
 
@@ -149,8 +148,8 @@ def cmd_check(a):
 
 
 def cmd_start(a):
-    """預設＝完整安裝（等同第一份 repo 完整版：語音、生圖、配樂、H3、放大全部裝，約 10.5 分鐘、約 1.5 單元；使用者 2026-10-11 指定）。
-    --h3-only＝只裝 ComfyUI＋H3（約 3.7 分鐘），給「本機準備、雲端只跑 H3」與本機＋Colab 一起跑（hybrid_h3.py）用。"""
+    """預設安裝完整的 Colab 雲端製片環境。
+    --h3-only 僅供已有素材、只需 H3 渲染的專門工作；新片請使用完整安裝。"""
     if not getattr(a, "h3_only", False):
         return cmd_full_setup(a)
     fresh = new_session(a.name, a.gpu)
@@ -222,7 +221,7 @@ def cmd_batch(a):
     vm_sh(a.name, "mkdir -p /content/jobs")
     upload(a.name, zp, f"/content/jobs/{batch}.zip")
     vm_sh(a.name, f"cd /content/jobs && python -c \"import zipfile; zipfile.ZipFile('{batch}.zip').extractall('.')\" && "
-                  f"nohup python /content/repo/cloud/vm/run_batch.py {batch} > /content/jobs/{batch}.log 2>&1 &")
+                  f"nohup env COLAB_RUNTIME=1 AI_ROOT=/content/AI REPO=/content/repo python /content/repo/cloud/vm/run_batch.py {batch} > /content/jobs/{batch}.log 2>&1 &")
     t0 = time.time(); seen = 0
     while True:
         time.sleep(int(os.environ.get("COLAB_POLL", "15")))     # 2026-10-11 實測：45 秒輪詢每批多耗損約 30 秒 → 預設 15
@@ -289,7 +288,7 @@ def cmd_full_setup(a):
 
 VM_ENV = ("AI_ROOT=/content/AI AI_TOOLS=/content/repo/tools PY_H3=python PY_VOICE=/content/AI/Voice/venv/bin/python "
           "PY_BREEZE=/content/AI/BreezeTTS/venv/bin/python PY_BREEZYVOICE=/content/AI/BreezyVoice/venv/bin/python "
-          "COMFY_DIR=/content/AI/H3/ComfyUI-0.36.0 H3_BACKEND=local UPSCALE=lanczos H3_PARALLEL=2")
+          "COMFY_DIR=/content/AI/H3/ComfyUI-0.36.0 COLAB_RUNTIME=1 H3_BACKEND=vm UPSCALE=lanczos H3_PARALLEL=2")
 
 
 def cmd_smoke(a):

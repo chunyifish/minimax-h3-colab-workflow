@@ -1,18 +1,16 @@
-# Colab CLI 跨電腦連線指南（Windows／MiniMax H3）
+# Codex＋Google Colab CLI 連線指南（Windows）
 
 最後更新：2026-10-24
 
-本指南供另一台 Windows 電腦上的 Codex 與使用者接手本專案。Colab CLI 登入只在本機設定憑證；新電腦必須自行登入。不要複製舊電腦的 OAuth 憑證，也不要把一次性授權碼貼到聊天、文件或截圖。
+本指南協助 Windows 上的 Codex 工作區連接 Google Colab。所有模型和影音工作都在 Colab VM 執行；本機只執行 Colab CLI、傳送檔案和檢視成果，不需要 NVIDIA 顯卡或本機模型。每台電腦都要在自己的 Terminal 完成登入。不要複製舊電腦的 OAuth 憑證，也不要把一次性授權碼貼到聊天、文件或截圖。
 
-本 repo 的 cloud/colab_h3.py 會直接呼叫 Colab CLI 來管理 session、上傳、下載與關機；這個工作流程不需要另外安裝 Colab MCP。
+本 repo 的 cloud/colab_h3.py 會直接呼叫官方 Colab CLI 管理工作階段、上傳、下載與關機，不需要另外安裝 Colab MCP。
 
-## 目前檢查結果
+## 開始前檢查
 
-- 目前工作區的 Colab CLI 0.7.5 已登入；執行 cloud/colab_h3.py check 顯示 0.00 compute units、使用率 0.00/hr、0 個作用中工作階段。
-- Colab 付費服務頁也顯示 0 個運算單元；Google One 頁面顯示 AI Pro，但家庭群組頁要求「設定家庭群組」。畫面沒有顯示 AI Pro 是否為免費學生試用，因此試用狀態尚未確認。
-- 如果是免費學生試用，額度為 0 很可能是方案資格限制，而不是 CLI 登入故障。Google 說 AI Pro 的 Colab 額度須為家庭方案管理者，且 Google One 試用會員不適用。請以目前帳戶的會員／付款詳情確認試用狀態。
-- 尚未啟動 Colab GPU、安裝 H3 或生成影片。
-- cloud/colab_h3.py 已有 H3 地區保護：偵測到授權排除地區或無法確認國家時，會停止並關閉該 Colab session。
+- 先執行 cloud/colab_h3.py check 查看登入狀態、運算餘額和作用中工作階段；check 不會啟動 GPU。
+- 帳戶方案名稱不保證有可用 Colab 額度。若 balance 為 0，先確認帳戶目前的 Colab 額度和資格，不要執行 start。
+- 啟動前閱讀 MiniMax H3 的現行授權條款及 CLI 顯示的機房位置。若位置不明或顯示授權提醒，先停止並核對，不要繞過提醒。
 
 ## 1. 在另一台電腦準備工作區
 
@@ -110,10 +108,10 @@ check 是連線／額度檢查，不會啟動 GPU。記錄版本、Current balan
 
 ## 4. 啟動 H3 前的必要檢查
 
-1. 在 Google One 會員或付款詳情確認學生優惠是否仍在免費試用期，以及該帳戶是否符合家庭方案管理者資格。Colab 頁面顯示 AI Pro 本身不足以證明有 Colab 額度。
-2. Colab 額度為 0 時先不要執行 start。Google Colab FAQ 說，無正數運算單元的免費 managed runtime 不允許主要繞過 notebook UI 操作網頁介面，且可能隨時被終止；本 repo 的影片生成流程使用 ComfyUI 網頁介面。
-3. H3 授權限制美國、歐盟、英國及南韓。Colab 分配的機房位置可能每次不同；repo 的保護程式會在位置遭排除或無法確認時停止並關閉 session。不要移除或繞過這道保護。
-4. cloud/colab_h3.py start 會申請 GPU 並消耗運算單元。必須先確認額度、機房／授權條件與使用者的資源使用決定，再開始。
+1. 在 Google 帳戶的 Colab／方案頁面確認目前可用額度。方案標籤或登入成功本身不能證明帳戶有可用額度。
+2. 額度為 0 時不要執行 start。等帳戶顯示可用額度後再繼續。
+3. 啟動時查看 CLI 顯示的機房位置，並遵守 MiniMax H3 現行授權。遇到排除地區或位置不明時停止，不要移除或繞過提醒。
+4. cloud/colab_h3.py start 會啟動雲端 GPU 並使用帳戶資源；開始前先確認帳戶額度和授權條件。
 
 符合條件並獲使用者決定開始後，repo 的 H3-only 流程為：
 

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Runs ON the Colab VM (started by cloud/colab_h3.py full-setup): the WHOLE local stack on Linux, for people whose computer
-# cannot run anything locally - voice (VoxCPM2, faster-whisper, separator), BreezyVoice, Breeze TTS 2, ComfyUI (H3, Qwen-Image 2.1,
-# Qwen-Edit 2511, Music 3, FlashVSR) + CJK fonts. Tested on a Colab L4 / G4 2026-10-10: setup/smoke_test.py passes everything
-# except rtx_vsr (Windows only; Linux uses FlashVSR or lanczos). Models ~150 GB of the VM's ~236 GB disk.
+# Runs ON the Colab VM (started by cloud/colab_h3.py start): the complete remote pipeline - voice (VoxCPM2, faster-whisper, separator),
+# BreezyVoice, Breeze TTS 2, ComfyUI (H3, Qwen-Image 2.1,
+# Qwen-Edit 2511, Music 3, FlashVSR) + CJK fonts.
 # Usage: AI_ROOT=/content/AI REPO=/content/repo bash install_full.sh   (prints [full] lines, FULL_DONE at the end)
 set -u
 AI="${AI_ROOT:-/content/AI}"; REPO="${REPO:-/content/repo}"; C="$AI/H3/ComfyUI-0.36.0"
 T0=$(date +%s); mark() { echo "[full] $1 = $(( $(date +%s) - T0 ))s"; }
-# Windows pip-freeze lists -> drop only the exact Windows-only / torch-family names (torch comes from the PyTorch index with its
+# Dependency snapshots -> drop only the exact platform-specific / torch-family names (torch comes from the PyTorch index with its
 # Linux CUDA wheels). Careful: a prefix match would also drop torchmetrics, torchsde and the nvidia-*-cu12 libs Linux needs.
 filt() { grep -viE '^(torch|torchaudio|torchvision|triton|triton-windows|nvidia-vfx|pywin32|pypiwin32|wmi)==' "$1"; }
 export UV_HTTP_TIMEOUT=300
@@ -39,11 +38,11 @@ uv pip install -q --python "$VP" torch==2.14.0 torchaudio==2.11.0 torchvision==0
   && uv pip install -q --python "$VP" --no-deps -r /content/req_voice.txt --index-strategy unsafe-best-match \
   && "$VP" -c "import voxcpm, faster_whisper, audio_separator, stable_whisper, parselmouth, pypinyin, opencc" && echo "[full] voice env OK" \
   || echo "[full] voice env FAILED"
-# --- BreezyVoice (Python 3.10; winstub instead of pynini = same behaviour as the Windows install)
+# --- BreezyVoice (Python 3.10; normalization fallback avoids the optional pynini build)
 BV="$AI/BreezyVoice"
 git clone -q --recurse-submodules https://github.com/mtkresearch/BreezyVoice "$BV/code" \
   && git -C "$BV/code" checkout -q d592c9d3e8927a0f53f68616387060dcd32a05ea && git -C "$BV/code" submodule update -q --init --recursive
-cp -r "$REPO/setup/breezyvoice/winstub" "$BV/winstub"
+cp -r "$REPO/setup/breezyvoice/normalizer_stub" "$BV/normalizer_stub"
 uv venv -q -p 3.10 "$BV/venv"; BP="$BV/venv/bin/python"
 uv pip install -q --python "$BP" "setuptools<70" wheel \
   && uv pip install -q --python "$BP" torch==2.7.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu128 \
@@ -69,7 +68,7 @@ if [ ! -f "$C/main.py" ]; then
     grep -viE '^(torch|torchvision|torchaudio)([=<> ]|$)' "$C/custom_nodes/ComfyUI-FlashVSR_Ultra_Fast/requirements.txt" >> /content/req_comfy.txt
   uv pip install --system -q -r /content/req_comfy.txt comfy-kitchen==0.2.37 && echo "[full] comfy OK" || echo "[full] comfy FAILED"
   git clone -q https://github.com/veda-sparse/Veda-on-ComfyUI "$C/custom_nodes/Veda-on-ComfyUI" && git -C "$C/custom_nodes/Veda-on-ComfyUI" checkout -q 67e4eb5541b648555563144401ebaba832bd73ec && echo "[full] veda node OK"
-  sed "s#C:/AI/H3/models#$AI/H3/models#" "$REPO/setup/extra_model_paths.yaml" > "$C/extra_model_paths.yaml"
+  cp "$REPO/setup/extra_model_paths.yaml" "$C/extra_model_paths.yaml"
 fi
 mark comfy
 

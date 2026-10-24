@@ -5,10 +5,10 @@ Writes every H3 prompt in the official `h3-prompt-writing` Ref2VA six-section fo
   subject_definitions: / summary: / retention_analysis: / detailed_description: / overall_soundscape: / non_diegetic_music:
 with <Subject N>, <Picture N>, <Audio N> labels, speaker IDs (S1), dialogue as <d>[Chinese] ...</d>, cuts as
 "[Shot 2] At 00:03.500, the camera cuts to ...", off-screen voice-over with closed lips, soundscape without dialogue.
-Then generates the clip on local ComfyUI with the settings validated in 〈老師，這次換你〉 (Ref2VA INT8, first frame pinned at
+Then generates the clip on the Colab VM ComfyUI with settings validated in the source project (Ref2VA INT8, first frame pinned at
 frame 0, 14 steps res_multistep, no EasyCache, lossless PNG frames re-encoded at CRF 12).
 
-Usage (H3 venv: C:\\AI\\H3\\venv\\Scripts\\python.exe, or C:\\AI\\tools\\make_shot.cmd):
+Usage: run generation through `python cloud/colab_h3.py film`; local use is limited to `--dry-run` and `--lint`.
   h3_shot.py shot.json --out <dir>            build prompt + lint + generate  -> <dir>/{prompt.txt, workflow_api.json, clip.mp4, meta.json}
   h3_shot.py shot.json --out <dir> --dry-run  build prompt + lint only (no GPU)
   h3_shot.py --lint prompt.txt [--duration 4]  check a hand-written prompt against the official format
@@ -21,7 +21,7 @@ Shot spec (JSON; relative paths resolve against the JSON file's folder):
   "setting": "a Taiwanese elementary school classroom",
   "first_frame": "kf.png",          # <Picture 1>; pinned at frame 0 (strongly recommended - project default)
   # "first_clip": "prev_tail22.mp4",  # optional: last 5/22/39 frames of the previous clip pinned at frames 0.. instead of the single first frame (continuation); keep first_frame = its last frame for <Picture 1>
-  "camera_video": {"file": "blender_S01.mp4"},   # optional <Video 1>: Blender previs camera/layout guide (blender-previs skill)
+  "camera_video": {"file": "motion_reference.mp4"},   # optional <Video 1>: a motion or layout reference uploaded to Colab
   # or {"file": "wm.mp4", "kind": "motion", "people": 1, "follow": "..."}: gray-mannequin motion reference from make_whitemodel.py
   #    (dance / fight shots, 2026-10-14; describe props such as swords in "action" - the mannequins carry none)
   "last_frame": "end.png",          # optional; pinned at the last frame (only for long continuous actions / fixed end states)
@@ -64,7 +64,7 @@ import urllib.request
 from pathlib import Path
 
 HOST = os.environ.get("COMFY_HOST", "http://127.0.0.1:8188")
-COMFY = Path(os.environ.get("COMFY_DIR", r"C:\AI\H3\ComfyUI-0.36.0"))
+COMFY = Path(os.environ.get("COMFY_DIR", "/content/AI/H3/ComfyUI-0.36.0"))
 FPS = 24
 SECTIONS = ["subject_definitions", "summary", "retention_analysis", "detailed_description", "overall_soundscape", "non_diegetic_music"]
 MODELS = dict(unet=os.environ.get("H3_UNET", "minimax_h3_ref2va_pruned_int8_convrot.safetensors"),  # H3_UNET: A/B other weights (e.g. unpruned minimax_h3_ref2va_int8_convrot.safetensors)
@@ -149,7 +149,7 @@ def build_prompt(spec):
         if cols:
             L.append(" ".join(f"<Subject {idx[s['key']]}> moves like the {c} mannequin." for s, c in zip(subs, cols)))
     elif cam:
-        L.append("<Video 1> is ONLY a " + cam.get("role", "Blender camera and spatial-layout guide")
+        L.append("<Video 1> is ONLY a " + cam.get("role", "3D camera and spatial-layout guide")
                  + ": its low-poly proxy figures and flat colors are not characters or visual style; only its camera path and spatial relationships are followed.")
     for k, v in enumerate(vrefs, start=1):  # 2026-10-23: up to 3 speakers, one <Audio k> each (node input ref_audio_{k-1})
         L.append(f"<Audio {k}> is the voice-timbre reference for {lab(v['subject'])}.")
@@ -324,7 +324,7 @@ def req(path, data=None, timeout=60):
 
 # Veda sparse attention (2026-10-16; needs ComfyUI >= 0.38 + custom_nodes/Veda-on-ComfyUI + setup/downloads_veda.json).
 # Measured on a Colab G4: shots <= 5 s about 3% faster, 12 s shots 29% (DMAD 4 steps) / 39% (14 steps) faster, no visible quality loss.
-# ON automatically for shots >= 7 s (H3_VEDA_MIN_SEC) when the server has the node (local 5090: 4.5 s shot +10% slower, 12 s shot -29%);
+# ON automatically for shots >= 7 s (H3_VEDA_MIN_SEC) when the server has the node;
 # spec "veda": true/false or env H3_VEDA=1/0 forces it.
 VEDA_PREDICTOR = os.environ.get("H3_VEDA_PREDICTOR", "minimax_h3_r2va_veda_preview_fp8.safetensors")
 VEDA_MIN_SEC = float(os.environ.get("H3_VEDA_MIN_SEC", "7"))   # auto-on only for shots >= 7 s; spec "veda": true/false or H3_VEDA=1/0 forces
@@ -336,7 +336,7 @@ def use_veda(spec):
     if spec.get("veda") is False or os.environ.get("H3_VEDA", "") == "0":
         return False
     forced = spec.get("veda") is True or os.environ.get("H3_VEDA", "") == "1"
-    if not forced and float(spec.get("duration", 0)) < VEDA_MIN_SEC:   # short shots: no gain (local 5090 +10% slower at 4.5 s)
+    if not forced and float(spec.get("duration", 0)) < VEDA_MIN_SEC:   # short shots: no gain in the Colab VM profile
         return False
     if not forced and spec.get("control"):   # with Fun ControlNet (skeleton/depth) Veda smeared fast arms and lost the crossed-leg pose (2026-10-16)
         return False
@@ -442,7 +442,7 @@ def build_graph(spec, prompt, base, tag):
             g[n] = {"class_type": "LoadImage", "inputs": {"image": stage(base / s["identity_image"], f"{tag}_id{i}.png")}}
             g["6"]["inputs"][f"ref_images.ref_image_{i}"] = [n, 0]
             i += 1
-    if spec.get("camera_video"):  # Blender previs camera guide (blender-previs skill), as in 〈那句話，我收回〉v5
+    if spec.get("camera_video"):  # optional guide video supplied to the Colab VM
         g["30"] = {"class_type": "LoadVideo", "inputs": {"file": stage(base / spec["camera_video"]["file"], f"{tag}_camera.mp4")}}
         g["31"] = {"class_type": "GetVideoComponents", "inputs": {"video": ["30", 0]}}
         g["6"]["inputs"]["ref_videos.ref_video_0"] = ["31", 0]
@@ -566,10 +566,12 @@ def main():
         sys.exit(1)
     if a.dry_run:
         return
+    if os.environ.get("COLAB_RUNTIME") != "1":
+        sys.exit("H3 generation is supported only in the Colab VM. Use cloud/colab_h3.py film.")
     try:
         req("/system_stats")
     except Exception as e:
-        sys.exit(f"ComfyUI not reachable at {HOST} ({e}); run C:\\AI\\tools\\start_comfy.cmd first")
+        sys.exit(f"Colab VM ComfyUI is not reachable at {HOST} ({e}); restart the Colab session first.")
     sys.exit(0 if generate(spec, prompt, spec_path.parent, out) else 1)
 
 

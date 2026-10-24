@@ -1,14 +1,12 @@
 """換聲（voice conversion）：保留來源人聲每個字的時間與語調，只把音色換成角色參考音。2026-10-23 建立。
-用途：Seedance 2.5 等雲端影片自己生的台詞聲音 → 換成你的角色參考音，嘴型時間不變（作者實測 14 句：像角色參考音 0.16 → 0.69）。
+用途：外部來源影片中已生成的台詞聲音 → 換成你的角色參考音，嘴型時間不變（作者實測 14 句：像角色參考音 0.16 → 0.69）。
 做法：用 BreezyVoice（CosyVoice-300M 架構）的零件，不經過文字：
   來源人聲 → speech_tokenizer（50 Hz 語音 token，帶內容與節奏）
   角色參考音 → 語音 token＋梅爾頻譜（當 flow 的提示）＋CAM++ 說話人向量
   flow.inference(來源 token, 提示＝參考音) → 梅爾 → HiFT 聲碼器 → 角色音色的同一句話（同長度）
 限制：念錯的字（聲調）會跟著來源一起保留——要修讀音就換用 TTS 重配那一句。來源最好先用 BS-RoFormer 分離出乾淨人聲。
 
-執行（BreezyVoice venv，Python 3.10）：
-  set PYTHONPATH=C:\\AI\\BreezyVoice\\winstub;C:\\AI\\BreezyVoice\\code;C:\\AI\\BreezyVoice\\code\\third_party\\Matcha-TTS
-  C:\\AI\\BreezyVoice\\venv\\Scripts\\python.exe tools\\cosy_vc.py jobs.json
+執行（Colab VM 的 BreezyVoice 環境）：python tools/cosy_vc.py jobs.json
 jobs.json：[{"src": "來源人聲.wav", "ref": "角色參考音.wav", "out": "輸出.wav"}, ...]   （相對路徑以 jobs.json 所在資料夾為準）
 輸出 22050 Hz 單聲道，長度與來源相同。"""
 import json
@@ -16,11 +14,13 @@ import os
 import sys
 from pathlib import Path
 
+if os.environ.get("COLAB_RUNTIME") != "1":
+    raise SystemExit("Voice conversion is supported only in the Colab VM.")
 import torch
 import torchaudio
 
-BV = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "BreezyVoice"  # AI_ROOT = install root (default C:\AI)
-for p in (BV / "winstub", BV / "code", BV / "code" / "third_party" / "Matcha-TTS"):
+BV = Path(os.environ.get("AI_ROOT", "/content/AI")) / "BreezyVoice"
+for p in (BV / "normalizer_stub", BV / "code", BV / "code" / "third_party" / "Matcha-TTS"):
     sys.path.insert(0, str(p))
 from hyperpyyaml import load_hyperpyyaml  # noqa: E402
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd  # noqa: E402

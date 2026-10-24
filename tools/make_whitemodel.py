@@ -10,7 +10,7 @@ SDPose skeleton control (arm shape, hook kick, crossed landing, timing) on 2 see
 
 Only use reference footage you are allowed to use; the source is for motion only and never appears in the final film.
 
-Usage (H3 venv):  C:\\AI\\H3\\venv\\Scripts\\python.exe tools\\make_whitemodel.py SRC.mp4 --out OUT.mp4
+Usage (Colab VM): python tools/make_whitemodel.py SRC.mp4 --out OUT.mp4
   --start 13.72 --frames 124       trim (seconds / frame count at 24 fps; frames should be 17n+5 to match an H3 shot length)
   --crop W:H:X:Y                   crop the source first (pixels of the source), e.g. to match the character's place in the first frame
   --size 1280x704                  output size (default: cropped source size); use the H3 shot size
@@ -19,7 +19,7 @@ Usage (H3 venv):  C:\\AI\\H3\\venv\\Scripts\\python.exe tools\\make_whitemodel.p
   --overlay                        also write OUT_overlay.mp4 (mesh over the source) to check the fit
   --colors blue,red                one fixed color per tracked person (needs custom node setup/comfy_nodes/whitemodel_color, 2026-10-15);
                                    prints which side of frame 0 each color starts on, so the shot spec can say "the blue mannequin is ..."
-Needs ComfyUI >= 0.37 running (tools\\start_comfy.cmd) and the models from setup/downloads_whitemodel.json:
+Needs ComfyUI >= 0.37 running in Colab and the models from setup/downloads_whitemodel.json:
   models/detection/sam_3d_body_dinov3_bf16.safetensors, models/geometry_estimation/moge_3_vitg_fp16.safetensors,
   models/diffusion_models/rt_detr_v4-x-hgnet_fp16.safetensors, models/checkpoints/sam3.1_multiplex_fp16.safetensors
 """
@@ -42,6 +42,8 @@ def probe(path):
 
 
 def main():
+    if __import__("os").environ.get("COLAB_RUNTIME") != "1":
+        sys.exit("Motion-reference preprocessing is supported only in the Colab VM.")
     ap = argparse.ArgumentParser(description="reference video -> gray mannequin video (SAM 3D Body) for H3 motion transfer")
     ap.add_argument("src")
     ap.add_argument("--out", required=True)

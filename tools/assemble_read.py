@@ -1,5 +1,5 @@
-"""生成前試映（二）：把讀本台詞照鏡表排成時間軸，配 16 宮格草圖做成試映影片，量出實際片長。
-2026-10-23 由原頻道各片的 preview/assemble_read.py 改成通用版。讀 preview/shots.json（格式見 make_storyboard.py 開頭）：
+"""在 Colab 依文字讀本與鏡表時間輸出試映影片，量出片長並估計 H3 鏡長。
+由 pipeline/template_colab/make_film.py 的 read stage 呼叫。讀 out/preview/shots.json：
   每鏡 lines＝[{"text": "台詞原文（念的字，不含說話者）", "caption": "字幕"}]；
   或舊做法 [{"wav": "台詞音檔（相對 shots.json）", "caption": "字幕"}]；兩者都沒有的只顯示字幕（群眾聲、音效、字卡說明）。
 ⭐ 2026-10-23 起預設「文字讀本」：台詞由 H3 拿角色參考音自己念，讀本不用先做 TTS。有 text 沒 wav 的句子用字數估長度：
@@ -7,16 +7,20 @@
   建議 H3 鏡長 h3_sec＝max(3, 該鏡台詞字數 ÷ H3_CPS＋H3_PAD)（每秒 3 字＋2 秒：H3 有時晚 1.5–2.1 秒才開口，再留反應尾巴；
   原頻道 7 句實測全部在這個長度內念完，最緊的 13 字句算出 6.3 秒、實際念到 6.16 秒）。多出來的空白剪接時裁掉。
   字數＝中文字＋英數字，不含標點。
-每鏡長度＝max(鏡表秒數 sec, 台詞總長＋前 0.25＋每句後 0.3 秒)。草圖格子用 storyboard_<k>_label.png（每 16 鏡一張，依鏡在
+每鏡長度＝max(鏡表秒數 sec, 台詞總長＋前 0.25＋每句後 0.3 秒)。可選擇性提供 storyboard_<k>_label.png（每 16 鏡一張，依鏡在
 shots 裡的順序對應；改劇本刪鏡後要沿用舊格子，可在鏡上寫 "panel_index": 舊序號，從 0 起算）。
 輸出（同資料夾）：讀本.wav（文字讀本時是靜音）、讀本_timeline.json（每鏡 dur、h3_sec）、讀本試映.mp4（720×1280）、_frames/。
-用法：python tools/assemble_read.py <片資料夾>/preview/shots.json"""
+輸出寫在 shots.json 同一個 Colab out/preview/ 資料夾。"""
 import json
+import os
 import re
 import subprocess
 import sys
 import wave
 from pathlib import Path
+
+if os.environ.get("COLAB_RUNTIME") != "1":
+    raise SystemExit("The text-read preview runs only in the Colab VM. Use cloud/colab_h3.py film <film folder> read.")
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont

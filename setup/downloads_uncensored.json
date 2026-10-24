@@ -5,6 +5,6 @@
     "revision": "e8967f6a39ea5b4939a1aff81be3e8706490c0e8",
     "size": 26363476151,
     "sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
-    "destination": "C:/AI/H3/models/text_encoders/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"
+    "destination": "H3/models/text_encoders/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors"
   }
 ]

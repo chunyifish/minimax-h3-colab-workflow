@@ -1,9 +1,9 @@
-"""Local speech-to-text with faster-whisper (GPU). Global tool.
+"""Speech-to-text with faster-whisper on the Colab VM.
 
-Prereqs: faster-whisper installed in C:/AI/Voice/venv; models cached in C:/AI/Voice/models/whisper.
+Prerequisites: faster-whisper installed in the Colab VM; models cached under /content/AI/Voice/models/whisper.
 
 Usage:
-  & "C:\\AI\\Voice\\venv\\Scripts\\python.exe" C:\\AI\\tools\\stt.py --audio in.wav --outdir out [--model large-v3] [--language zh|auto]
+  python tools/stt.py --audio in.wav --outdir out [--model large-v3] [--language zh|auto]
 
 Writes <outdir>/transcript.txt, transcript.srt and transcript.json.
 """
@@ -13,8 +13,8 @@ import sys
 import os
 from pathlib import Path
 
-MODEL_CACHE = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "Voice" / "models" / "whisper"  # AI_ROOT = install root (default C:\AI)
-DEFAULT_PROMPT = "繁體中文，教學、AI 影片製作、ComfyUI、MiniMax H3、Blender。"
+MODEL_CACHE = Path(os.environ.get("AI_ROOT", "/content/AI")) / "Voice" / "models" / "whisper"
+DEFAULT_PROMPT = "繁體中文，教學、AI 影片製作、ComfyUI、MiniMax H3。"
 
 
 def _add_cuda_dll_dirs():
@@ -64,7 +64,10 @@ def fmt_ts(seconds: float, comma: bool = False) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Transcribe audio locally with faster-whisper.")
+    if os.environ.get("COLAB_RUNTIME") != "1":
+        print("Speech-to-text is supported only in the Colab VM.", file=sys.stderr)
+        return 2
+    ap = argparse.ArgumentParser(description="Transcribe audio on the Colab VM with faster-whisper.")
     ap.add_argument("--audio", required=True)
     ap.add_argument("--outdir", default=".")
     ap.add_argument("--model", default="large-v3")
@@ -86,7 +89,7 @@ def main() -> int:
         _add_cuda_dll_dirs()
         from faster_whisper import WhisperModel
     except ImportError:
-        print("faster-whisper not found. Run with C:\\AI\\Voice\\venv\\Scripts\\python.exe", file=sys.stderr)
+        print("faster-whisper is not installed in this Colab environment.", file=sys.stderr)
         return 3
 
     model = WhisperModel(a.model, device=a.device, compute_type=a.compute_type,

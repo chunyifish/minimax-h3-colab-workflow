@@ -1,5 +1,4 @@
-"""Batch Breeze TTS 2 generation (loads the model once). Mirrors the official infer.py eager path.
-Run with C:\\AI\\BreezeTTS\\venv\\Scripts\\python.exe breeze_batch.py jobs.json
+"""Batch Breeze TTS 2 generation on the Colab VM (loads the model once).
 jobs.json: {"out_dir": "...", "jobs": [{"name", "text", "instruction"?, "ref_audio"?, "ref_text"?, "seed"?, "cfg"?}]}
 Existing outputs are skipped. Log -> <out_dir>/breeze_log.jsonl."""
 import json
@@ -8,9 +7,12 @@ import time
 import os
 from pathlib import Path
 
-REPO = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "BreezeTTS" / "breeze-tts"  # AI_ROOT = install root (default C:\AI; Linux/Colab e.g. /content/AI)
-MODEL = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "BreezeTTS" / "breeze-tts-2"
+REPO = Path(os.environ.get("AI_ROOT", "/content/AI")) / "BreezeTTS" / "breeze-tts"
+MODEL = Path(os.environ.get("AI_ROOT", "/content/AI")) / "BreezeTTS" / "breeze-tts-2"
 sys.path.insert(0, str(REPO))
+
+if os.environ.get("COLAB_RUNTIME") != "1":
+    raise SystemExit("Breeze TTS generation is supported only in the Colab VM.")
 
 import soundfile as sf  # noqa: E402
 import torch  # noqa: E402

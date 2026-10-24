@@ -1,9 +1,8 @@
-"""安裝完成後的自我驗證：每個本地模型各跑一個小工作，不需要任何外部素材（聲音、圖片都自己生）。
-用 H3 venv 執行（ComfyUI 要先啟動：call configs\\profile.cmd → tools\\start_comfy.cmd）：
-  C:\\AI\\H3\\venv\\Scripts\\python.exe setup\\smoke_test.py [--quick]
-完整版 14 步；--quick 跳過 FlashVSR（13 步）。結果寫 setup\\smoke_out\\report.json，並印出跟 docs\\hardware.md 對照用的時間。
+"""在 Colab VM 完整安裝後執行小型端到端檢查，不需要外部素材。
+由 cloud/colab_h3.py smoke 啟動；--quick 跳過 FlashVSR。
+結果寫入 setup/smoke_out/report.json。
 流程：Breeze 設計聲音 → BreezyVoice 用它念台詞＋自動挑選 → VoxCPM2（備用引擎）→ faster-whisper 聽寫 → 聲調比對 → Qwen-Image 2.1 生首幀 → Qwen 附參考圖 →
-MiniMax Music 3 → BS-RoFormer 分離 → H3（DMAD 4 步，首幀＋配音當固定音軌）→ RTX VSR → FlashVSR"""
+MiniMax Music 3 → BS-RoFormer 分離 → H3（DMAD 4 步，首幀＋配音當固定音軌）→ Colab Lanczos／FlashVSR"""
 import json
 import os
 import subprocess
@@ -12,6 +11,10 @@ import time
 import urllib.request
 import wave
 from pathlib import Path
+
+if os.environ.get("COLAB_RUNTIME") != "1":
+    sys.exit("Smoke checks run only inside the Colab VM. Use python cloud/colab_h3.py smoke.")
+
 for _s in (sys.stdout, sys.stderr):                 # 中文輸出在非 UTF-8 主控台不變亂碼
     try:
         _s.reconfigure(encoding="utf-8", errors="replace")
@@ -20,13 +23,13 @@ for _s in (sys.stdout, sys.stderr):                 # 中文輸出在非 UTF-8 �
 
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "smoke_out"; OUT.mkdir(exist_ok=True)
-T = Path(os.environ.get("AI_TOOLS", r"C:\AI\tools"))
-PYH3 = os.environ.get("PY_H3", r"C:\AI\H3\venv\Scripts\python.exe")
-PYV = os.environ.get("PY_VOICE", r"C:\AI\Voice\venv\Scripts\python.exe")
-PYB = os.environ.get("PY_BREEZE", r"C:\AI\BreezeTTS\venv\Scripts\python.exe")
-PYBV = os.environ.get("PY_BREEZYVOICE", r"C:\AI\BreezyVoice\venv\Scripts\python.exe")
+T = Path(os.environ.get("AI_TOOLS", "/content/repo/tools"))
+PYH3 = os.environ.get("PY_H3", "python")
+PYV = os.environ.get("PY_VOICE", "/content/AI/Voice/venv/bin/python")
+PYB = os.environ.get("PY_BREEZE", "/content/AI/BreezeTTS/venv/bin/python")
+PYBV = os.environ.get("PY_BREEZYVOICE", "/content/AI/BreezyVoice/venv/bin/python")
 SEP = os.environ.get("SEPARATOR", str(Path(PYV).parent / ("audio-separator.exe" if os.name == "nt" else "audio-separator")))
-AI_ROOT = Path(os.environ.get("AI_ROOT", r"C:\AI"))   # install root (Linux/Colab e.g. /content/AI)
+AI_ROOT = Path(os.environ.get("AI_ROOT", "/content/AI"))
 HOST = os.environ.get("COMFY_HOST", "http://127.0.0.1:8188")
 QUICK = "--quick" in sys.argv
 LINE = "老師，考卷是熱的。"
@@ -79,7 +82,7 @@ def step(name, cmd, expect=None, timeout=1800):
 
 def main():
     if not comfy_ok():
-        sys.exit(f"ComfyUI not running at {HOST}: call configs\\profile.cmd, then tools\\start_comfy.cmd")
+        sys.exit(f"Colab VM ComfyUI is not running at {HOST}. Restart the Colab session and try again.")
     # --- 聲音（ComfyUI 先釋放顯存）
     free_comfy()
     (OUT / "breeze.json").write_text(json.dumps(dict(out_dir="breeze", jobs=[dict(
@@ -144,18 +147,14 @@ def main():
     if mus:
         step("separator", [SEP, str(mus), "--model_filename", "model_bs_roformer_ep_317_sdr_12.9755.ckpt", "--model_file_dir", str(AI_ROOT / "Voice" / "models" / "separator"),
                            "--output_dir", "sep", "--output_format", "WAV"], lambda: newest(OUT / "sep", {".wav"}))
-    if clip:
-        (OUT / "vsr_1080p.mp4").unlink(missing_ok=True)
-        if os.name == "nt":                      # RTX VSR (nvvfx) exists only on Windows; Linux/Colab uses FlashVSR or lanczos
-            step("rtx_vsr", [PYH3, str(T / "upscale_vsr.py"), "--source", str(clip), "--output", "vsr_1080p.mp4"], "vsr_1080p.mp4")
-        else:
-            print("SKIP rtx_vsr        (Windows only)", flush=True)
-        if not QUICK:
-            step("flashvsr", [PYH3, str(T / "flashvsr_cli.py"), str(clip), "flashvsr"], "flashvsr/clip.mp4")
+    if clip and not QUICK:
+        step("flashvsr", [PYH3, str(T / "flashvsr_cli.py"), str(clip), "flashvsr"], "flashvsr/clip.mp4")
+    elif QUICK:
+        print("SKIP flashvsr      (--quick)", flush=True)
     (OUT / "report.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
     bad = [r["step"] for r in rows if not r["ok"]]
     print("\nALL OK" if not bad else f"\nFAILED: {bad}  (see setup/smoke_out/report.json)")
-    print("Watch setup/smoke_out/h3/clip.mp4 and vsr_1080p.mp4 to check picture and lip-sync.")
+    print("Watch setup/smoke_out/h3/clip.mp4 and flashvsr/clip.mp4 (if enabled) to check picture and lip-sync.")
 
 
 if __name__ == "__main__":

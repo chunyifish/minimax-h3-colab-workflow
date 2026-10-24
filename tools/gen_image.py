@@ -1,9 +1,8 @@
-"""Local image generation via the ComfyUI API.
+"""Generate images through the ComfyUI API on the Colab VM.
 
 Main model = Qwen-Image 2.1. Other installed options: Krea 2, Qwen-Image-Edit 2511.
 
-Prereqs:
-  * ComfyUI running on http://127.0.0.1:8188  (see tools/start_comfy.ps1)
+Prerequisites: run this command inside the Colab VM after cloud/vm/install_full.sh.
 
 Presets (--model):
   qwen21         Qwen-Image 2.1 (official int8)                steps 50, cfg 1, default 2688x1536 (2K)
@@ -11,11 +10,10 @@ Presets (--model):
   qwen21-turbo   Qwen-Image 2.1 Turbo (int8, = --turbo)        fixed 8 steps, cfg 1, official sigmas (ManualSigmas)
                  DRAFT / composition sampling / fallback only (~12 s per 2K image vs ~63 s). Skin smoother, specific
                  expressions drift toward a smile, shadows crushed -> finals stay on qwen21 50 steps. Character LoRAs
-                 (--lora) work. Tested 2026-10-12 (author RTX 5090: ~12 s vs ~63 s per 2K image).
+                 (--lora) work.
 
-Qwen-Image 2.1 quality defaults (A/B 2026-09-28): 50 steps + native 2K + a LONG
-photographer-style prompt (camera/lens, light, subject, simple background, "uncluttered") is what closes most of the gap
-to Image 2.5; listing every room object makes a cluttered image. cfg stays 1 (official), so --negative is ignored.
+Qwen-Image 2.1 defaults: 50 steps + native 2K + a detailed photographer-style prompt (camera/lens, light, subject,
+simple background, "uncluttered"). Listing every room object makes a cluttered image. cfg stays 1 (official), so --negative is ignored.
   krea2          Krea 2 Turbo (official fp8)                   steps 8,  cfg 1
   krea2-unc      Krea 2 Turbo (uncensored v1.1)                steps 8,  cfg 1
   qwen-edit      Qwen-Image-Edit 2511 (official fp8mixed)      steps 20, cfg 4
@@ -38,7 +36,7 @@ import urllib.request
 from pathlib import Path
 
 DEFAULT_HOST = os.environ.get("COMFY_HOST", "http://127.0.0.1:8188")
-COMFY_DIR = Path(os.environ.get("COMFY_DIR", r"C:\AI\H3\ComfyUI-0.36.0"))
+COMFY_DIR = Path(os.environ.get("COMFY_DIR", "/content/AI/H3/ComfyUI-0.36.0"))
 
 PRESETS = {
     "qwen21": dict(
@@ -98,7 +96,7 @@ def ensure_server(host):
     try:
         return _req(host, "/system_stats", timeout=5)
     except Exception as e:
-        raise SystemExit(f"ComfyUI is not reachable at {host} ({e}).\nStart it: tools\\start_comfy.ps1")
+        raise SystemExit(f"Colab VM ComfyUI is not reachable at {host} ({e}). Start the Colab session again.")
 
 
 def stage_image(image):
@@ -191,7 +189,7 @@ def build(a, preset, prompt):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Generate an image locally via ComfyUI.")
+    ap = argparse.ArgumentParser(description="Generate an image on the Colab VM via ComfyUI.")
     ap.add_argument("--prompt", default=None)
     ap.add_argument("--prompt-file", default=None)
     ap.add_argument("--negative", default="blurry, low quality, jpeg artifacts, extra limbs, watermark, text")
@@ -219,6 +217,8 @@ def main():
     ap.add_argument("--lora", action="append", default=None, help="LoRA file[:strength], repeatable (e.g. afu_qwen21.safetensors:1.0)")
     a = ap.parse_args()
 
+    if os.environ.get("COLAB_RUNTIME") != "1":
+        raise SystemExit("Image generation is supported only in the Colab VM. Use cloud/colab_h3.py film.")
     name = "qwen21-unc" if a.uncensored else a.model
     if a.turbo:
         if a.uncensored or name not in ("qwen21", "qwen21-turbo"):

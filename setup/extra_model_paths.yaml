@@ -1,5 +1,5 @@
-h3_local:
-  base_path: C:/AI/H3/models
+h3_colab:
+  base_path: /content/AI/H3/models
   diffusion_models: diffusion_models
   text_encoders: text_encoders
   vae: vae

@@ -1,7 +1,5 @@
 """Runs ON the Colab VM (started by cloud/colab_h3.py start): ComfyUI 0.40.0 + MiniMax H3 + DMAD + Veda sparse attention (2026-10-16), then N ComfyUI instances.
-Measured on a Colab G4 (RTX PRO 6000 Blackwell, 2026-10-10): about 3.5 minutes from a fresh VM to ready;
-best throughput = 2 instances, --reserve-vram 46 each, models kept loaded (no --cache-none), second instance's jobs start 30 s later.
-Uses the VM's own torch (2.11) - same H3 result as the Windows/torch 2.14 install (PSNR 45.9 dB vs Desk 5090).
+Uses the Colab VM's own PyTorch installation.
 Args: --instances 1|2|3 (default 2)   --encoder heretic|nvfp4 (default heretic = the int8 encoder the project uses)"""
 import argparse, json, os, shutil, subprocess, threading, time, urllib.request
 from pathlib import Path
@@ -12,7 +10,7 @@ ap.add_argument("--encoder", default="heretic", choices=["heretic", "nvfp4"])
 a = ap.parse_args()
 
 AI = Path(os.environ.get("AI_ROOT", "/content/AI")); REPO = Path(os.environ.get("REPO", "/content/repo"))
-C = AI / "H3" / "ComfyUI-0.36.0"          # same folder name as the Windows install, so the download manifests map 1:1
+C = AI / "H3" / "ComfyUI-0.36.0"          # shared path used by the Colab model manifests
 T0 = time.time()
 STATE = Path("/content/h3_state.json")
 
@@ -55,7 +53,7 @@ if not (C / "main.py").exists():
     sh(f"grep -viE '^(torch|torchvision|torchaudio)([=<> ]|$)' {C}/requirements.txt > /content/req_comfy.txt"
        f" && uv pip install --system -q -r /content/req_comfy.txt comfy-kitchen==0.2.37")
     sh("git clone -q https://github.com/veda-sparse/Veda-on-ComfyUI " + str(C) + "/custom_nodes/Veda-on-ComfyUI && git -C " + str(C) + "/custom_nodes/Veda-on-ComfyUI checkout -q 67e4eb5541b648555563144401ebaba832bd73ec")
-    sh(f"sed 's#C:/AI/H3/models#{AI}/H3/models#' {REPO}/setup/extra_model_paths.yaml > {C}/extra_model_paths.yaml")
+    shutil.copy2(REPO / "setup" / "extra_model_paths.yaml", C / "extra_model_paths.yaml")
 mark("comfy_installed")
 dl.wait()
 tail = Path("/content/h3_download.log").read_text(errors="replace")[-400:]

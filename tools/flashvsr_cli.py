@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # This script imports ComfyUI and ComfyUI-FlashVSR_Ultra_Fast (GPL-3.0) code at runtime, so it is licensed GPL-3.0-or-later.
-"""FlashVSR v1.1 x2（不經 ComfyUI 伺服器，直接載入節點程式）。H3 venv：python flashvsr_cli.py in.mp4 out_dir"""
+"""FlashVSR v1.1 x2 on the Colab VM (directly loads the ComfyUI node)."""
 import importlib.util
 import json
 import subprocess
@@ -9,10 +9,13 @@ import time
 import os
 from pathlib import Path
 
+if os.environ.get("COLAB_RUNTIME") != "1":
+    raise SystemExit("FlashVSR is supported only in the Colab VM.")
+
 import numpy as np
 import torch
 
-COMFY = Path(os.environ.get("COMFY_DIR", r"C:\AI\H3\ComfyUI-0.36.0"))
+COMFY = Path(os.environ.get("COMFY_DIR", "/content/AI/H3/ComfyUI-0.36.0"))
 sys.path.insert(0, str(COMFY))
 src, d = Path(sys.argv[1]), Path(sys.argv[2]); d.mkdir(parents=True, exist_ok=True)
 NODE = COMFY / "custom_nodes" / "ComfyUI-FlashVSR_Ultra_Fast"

@@ -1,9 +1,8 @@
-"""《山獅霸的多重宇宙》頻道片尾範本（2026-09-30，阿福〈三個絕招〉定稿使用的版本）
+"""片尾範本
 結構：N 張特寫靜幀（緩推＋下緣壓暗）＋每張 2 行「AI 工具・用途」名單 → 金色咒印法陣＋大標題逐字由光浮現、爆光、淡出。
-用法（H3 venv 有 numpy／Pillow／ffmpeg 即可）：
-    C:\\AI\\H3\\venv\\Scripts\\python.exe render_ending.py config.json
+在 Colab VM 執行（numpy／Pillow／ffmpeg 已隨環境安裝）：python templates/ending/render_ending.py config.json
 config.json 範例見同資料夾 config_example.json。輸出 24fps、1920x1080、無音訊（配樂與音效在主片後製疊）。
-規則：名單依實際使用的工具填寫；非商用授權工具（使用者指示）不列名；MiniMax Music 3 等要求標示的授權需列名並揭露 AI 生成。"""
+規則：名單依實際使用的工具填寫；非商用授權工具不列名；MiniMax Music 3 等要求標示的授權需列名並揭露 AI 生成。"""
 import json, subprocess, sys
 from pathlib import Path
 import numpy as np
@@ -12,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageChops
 HERE = Path(__file__).resolve().parent
 W, H, FPS = 1920, 1080, 24
 sys.path.insert(0, str(HERE.parents[1] / "tools"))
-from fonts import font  # noqa: E402  (Windows 字型；Linux 用文鼎楷書／Noto CJK)
+from fonts import font  # noqa: E402 (Colab Noto CJK fonts)
 FONT_TITLE = font("kai")        # 標楷體：大標題
 FONT_BOLD = font("jhbd")        # 微軟正黑粗體：名單
 GLOW, CORE = (255, 190, 60), (255, 246, 215)

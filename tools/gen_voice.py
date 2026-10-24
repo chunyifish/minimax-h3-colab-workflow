@@ -1,13 +1,10 @@
-"""Local voice generation and speech synthesis (TTS) via VoxCPM2 and Edge-TTS.
+"""Voice generation and speech synthesis (TTS) on the Colab VM via VoxCPM2 and Edge-TTS.
 
 Engines:
-  voxcpm2   OpenBMB VoxCPM2 on NVIDIA RTX 5090 CUDA (48 kHz high-fidelity, voice cloning)
+  voxcpm2   OpenBMB VoxCPM2 on the Colab GPU (48 kHz high-fidelity, voice cloning)
   edge      Microsoft Edge TTS (fast, zero GPU memory, broadcast neural voices)
 
-Examples:
-  & "C:\\AI\\Voice\\venv\\Scripts\\python.exe" C:\\AI\\tools\\gen_voice.py --text "大家好，今天進行語音生成測試。"
-  & "C:\\AI\\Voice\\venv\\Scripts\\python.exe" C:\\AI\\tools\\gen_voice.py --text "測試" --ref "C:\\path\\sample.wav" --out "out.wav"
-  & "C:\\AI\\Voice\\venv\\Scripts\\python.exe" C:\\AI\\tools\\gen_voice.py --engine edge --text "微軟雲端語音測試" --voice zh-TW-HsiaoChenNeural
+Example: python tools/gen_voice.py --engine edge --text "微軟雲端語音測試" --voice zh-TW-HsiaoChenNeural --out out.mp3
 """
 import argparse
 import json
@@ -17,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-VOICE_DIR = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "Voice"  # AI_ROOT = install root (default C:\AI)
+VOICE_DIR = Path(os.environ.get("AI_ROOT", "/content/AI")) / "Voice"
 DEFAULT_REF = VOICE_DIR / "references" / "default.wav"
 OUTPUT_DIR = VOICE_DIR / "output"
 MODEL_PATH = VOICE_DIR / "models" / "VoxCPM2"
@@ -72,7 +69,9 @@ def shutil_which(cmd):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate speech locally or via Edge-TTS.")
+    if os.environ.get("COLAB_RUNTIME") != "1":
+        raise SystemExit("Voice generation is supported only in the Colab VM. Use cloud/colab_h3.py film.")
+    parser = argparse.ArgumentParser(description="Generate speech on the Colab VM.")
     parser.add_argument("--text", type=str, help="Text to speak")
     parser.add_argument("--text-file", type=str, help="File containing text to speak")
     parser.add_argument("--engine", choices=["voxcpm2", "edge"], default="voxcpm2", help="TTS Engine")

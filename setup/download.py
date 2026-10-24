@@ -11,7 +11,7 @@ resolved once, then 16 long ranged streams write straight into <file>.verified-t
 kept in <file>.progress.json so an interrupted download resumes. HTTP 429 / 5xx are retried with backoff.
 (2026-10-10: the old 8 MB-per-request scheme sent ~3,000 requests per 26 GB file to huggingface.co and got
 HTTP 429 Too Many Requests when several manifests ran at once on Colab.)
-Set AI_ROOT to install somewhere other than C:/AI (e.g. /content/AI on Colab/Linux); set HF_TOKEN for higher limits.
+Model paths in the manifest are relative to AI_ROOT (default /content/AI); set HF_TOKEN for higher limits.
 Exit code is non-zero if any file fails."""
 import concurrent.futures as cf
 import hashlib
@@ -31,17 +31,15 @@ items = json.loads(manifest.read_text(encoding='utf-8-sig'))
 SMALL = 8 * 1024 * 1024       # files up to this size: one request
 SEGMENTS = 16                 # long ranged streams per large file
 READ = 4 * 1024 * 1024
-UA = {'User-Agent': 'H3-local-setup/1.2'}
+UA = {'User-Agent': 'H3-Colab-setup/1.2'}
 if os.environ.get('HF_TOKEN'):
     UA['Authorization'] = f"Bearer {os.environ['HF_TOKEN']}"
-AI_ROOT = os.environ.get('AI_ROOT')                    # manifests are written for C:/AI; set AI_ROOT (e.g. /content/AI) to install elsewhere
+AI_ROOT = Path(os.environ.get('AI_ROOT', '/content/AI'))
 
 
 def destination(item):
-    d = item['destination'].replace('\\', '/')
-    if AI_ROOT and d.startswith('C:/AI/'):
-        return Path(AI_ROOT) / d[len('C:/AI/'):]
-    return Path(d)
+    d = Path(item['destination'])
+    return d if d.is_absolute() else AI_ROOT / d
 
 
 def verify(path, item):

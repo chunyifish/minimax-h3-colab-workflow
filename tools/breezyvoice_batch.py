@@ -1,10 +1,5 @@
-"""BreezyVoice（聯發科＋台大，Apache-2.0 可商用台灣國語 TTS）批次生成：模型只載一次，每句抽多個 seed 當候選。2026-10-07 建立。
-挑選用 breezyvoice_pick.py（Voice venv：ASR 必須全對＋對照 edge-tts 台灣國語參考音的腔調分數）。一鍵：make_breezyvoice.cmd jobs.json
-
-執行（BreezyVoice venv，Python 3.10）：
-  set PYTHONUTF8=1
-  set PYTHONPATH=C:\\AI\\BreezyVoice\\winstub;C:\\AI\\BreezyVoice\\code;C:\\AI\\BreezyVoice\\code\\third_party\\Matcha-TTS
-  C:\\AI\\BreezyVoice\\venv\\Scripts\\python.exe C:\\AI\\tools\\breezyvoice_batch.py jobs.json
+"""BreezyVoice batch synthesis on the Colab VM (one model load, multiple candidate seeds).
+Selection is performed by breezyvoice_pick.py using ASR and Taiwanese Mandarin pronunciation scoring.
 
 jobs.json（相對路徑以 jobs.json 所在資料夾為準）：
 {"out_dir": "bv", "seeds": 8,
@@ -12,8 +7,7 @@ jobs.json（相對路徑以 jobs.json 所在資料夾為準）：
 輸出 <out_dir>/cand/<name>_s<seed>.wav（22.05 kHz），已存在就跳過；紀錄 <out_dir>/bv_log.jsonl。
 
 念不準的字：直接在文字裡標注音，例如「連假[:ㄐㄧㄚ4]」（標在該字後面），不必再找同音字；下方 TW_BOPO 會自動補常見的台灣讀音。
-數字：Windows 版沒有文字正規化（pynini 裝不了），阿拉伯數字會自動轉成國字（只處理整數）。
-Windows 的坑：g2pw 的多程序 DataLoader 會卡死 → 建立後設 num_workers=0（已處理）。"""
+阿拉伯數字會自動轉成國字（只處理整數）。"""
 import json
 import os
 import re
@@ -21,10 +15,12 @@ import sys
 import time
 from pathlib import Path
 
-BV = Path(os.environ.get("AI_ROOT", r"C:\AI")) / "BreezyVoice"  # AI_ROOT = install root (default C:\AI)
+if os.environ.get("COLAB_RUNTIME") != "1":
+    raise SystemExit("BreezyVoice synthesis is supported only in the Colab VM.")
+BV = Path(os.environ.get("AI_ROOT", "/content/AI")) / "BreezyVoice"
 SPEC = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None   # resolve before chdir
 os.chdir(BV / "code")
-for p in (BV / "winstub", BV / "code", BV / "code" / "third_party" / "Matcha-TTS"):
+for p in (BV / "normalizer_stub", BV / "code", BV / "code" / "third_party" / "Matcha-TTS"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
