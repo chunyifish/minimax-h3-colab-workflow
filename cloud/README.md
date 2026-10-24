@@ -15,6 +15,8 @@
 
 ## 1. 準備（一次）
 
+Windows 跨電腦安裝、OAuth 操作與常見問題另見[跨電腦 Colab CLI 指南](../COLAB_CLI_跨電腦連線指南.md)。
+
 1. 有一個 **Google AI 方案**（AI Pro 每月約 200 運算單元；**免費試用期間不發**）或在 Colab 買**隨用隨付**運算單元（100 個 US$10.49）。
 2. 安裝 Colab CLI（Google 官方，Apache-2.0）：
    ```
