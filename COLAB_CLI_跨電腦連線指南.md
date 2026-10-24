@@ -19,18 +19,18 @@
 若尚未取得 repo，可從工作區父資料夾執行：
 
 ~~~powershell
-git clone https://github.com/mathruffian-dot/shanshiba-workflow-colab.git
+git clone https://github.com/chunyifish/minimax-h3-colab-workflow.git
 ~~~
 
 先確認電腦已安裝 Python 3.12 和 uv。uv 安裝方式見 [uv 官方安裝說明](https://docs.astral.sh/uv/getting-started/installation/)。
 
 ## 2. Windows PowerShell 安裝 Colab CLI
 
-以下做法把 CLI、快取、暫存與登入設定放在 Git repo 外的工作區父資料夾。若 PowerShell 目前位於包含 shanshiba-workflow-colab 子資料夾的工作區：
+以下做法把 CLI、快取、暫存與登入設定放在 Git repo 外的工作區父資料夾。若 PowerShell 目前位於包含 minimax-h3-colab-workflow 子資料夾的工作區：
 
 ~~~powershell
 $WorkRoot = (Get-Location).Path
-$RepoRoot = Join-Path $WorkRoot "shanshiba-workflow-colab"
+$RepoRoot = Join-Path $WorkRoot "minimax-h3-colab-workflow"
 ~~~
 
 若 PowerShell 已在 repo 根目錄，改用：
@@ -69,7 +69,7 @@ colab version
 
 ~~~powershell
 $WorkRoot = "C:\path\to\workspace"
-$RepoRoot = Join-Path $WorkRoot "shanshiba-workflow-colab"
+$RepoRoot = Join-Path $WorkRoot "minimax-h3-colab-workflow"
 $CliRoot = Join-Path $WorkRoot ".colab-cli-venv2"
 $CliPython = Join-Path $CliRoot "Scripts\python.exe"
 $CliScripts = Join-Path $CliRoot "Scripts"
